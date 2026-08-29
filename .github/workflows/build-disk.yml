@@ -24,6 +24,7 @@ on:
       - './.github/workflows/build-disk.yml'
 
 env:
+  NODE_VERSION: '24' # forza tutte le actions a girare su runtime Node 24 (i runner di default usano Node 20)
   IMAGE_NAME: ${{ github.event.repository.name }} # output of build.yml, keep in sync
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
   DEFAULT_TAG: "latest"
