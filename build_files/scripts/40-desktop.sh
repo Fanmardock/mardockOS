@@ -91,6 +91,10 @@ glib-compile-schemas /usr/share/glib-2.0/schemas
 mkdir -p /etc/skel/.config/niri/
 cp -rf /ctx/dot_config/niri/. /etc/skel/.config/niri/
 
+# Copia Kitty Config di Default
+mkdir -p /etc/skel/.config/kitty/
+cp -rf /ctx/dot_config/kitty/. /etc/skel/.config/kitty/
+
 # Provisioning Flatpak
 cat > /usr/lib/systemd/system/flatpak-provisioning.service << 'UNIT'
 [Unit]
