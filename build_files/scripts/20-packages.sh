@@ -44,6 +44,24 @@ rum install -y --allowerasing \
     vulkan-tools
 
 ## ==========================================
+## 2b. ABILITAZIONE COPR XPADNEO
+## ==========================================
+# akmod-xpadneo NON è presente nei repository ufficiali Fedora/RakuOS:
+# vive nel COPR shdwchn10/xpadneo (il vecchio sentry/xpadneo è stato rimosso).
+# Scriviamo il file .repo inline così è idempotente e non dipende da $releasever.
+cat > /etc/yum.repos.d/copr-xpadneo.repo << 'EOF'
+[copr:shdwchn10:xpadneo]
+name=Copr repo for xpadneo owned by shdwchn10
+baseurl=https://download.copr.fedorainfracloud.org/results/shdwchn10/xpadneo/fedora-$releasever-$basearch/
+type=rpm-md
+skip_if_unavailable=True
+gpgcheck=1
+gpgkey=https://download.copr.fedorainfracloud.org/results/shdwchn10/xpadneo/pubkey.gpg
+repo_gpgcheck=0
+enabled=1
+EOF
+
+## ==========================================
 ## 3. APPLICAZIONI, UTILITY & XBOX DRIVERS
 ## ==========================================
 rum install -y --allowerasing \
