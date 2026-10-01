@@ -113,6 +113,7 @@ input {
     position x=1280 y=0
 }
 
+
 // Settings that influence how windows are positioned and sized.
 // Find more information on the wiki:
 // https://niri-wm.github.io/niri/Configuration:-Layout
@@ -177,7 +178,7 @@ layout {
         // - CSS-like notation: "rgb(255, 127, 0)", rgba(), hsl() and a few others.
 
         // Color of the ring on the active monitor.
-        active-color "#c614f7"
+        active-color "#9b51b2"
 
         // Color of the ring on inactive monitors.
         //
@@ -287,7 +288,7 @@ layout {
 spawn-at-startup "lxpolkit"
 spawn-at-startup "blueman-applet"
 spawn-at-startup "amixer" "sset" "Speaker" "unmute"
-
+spawn-at-startup "musicbg"
 // To run a shell command (with variables, pipes, etc.), use spawn-sh-at-startup:
 // spawn-sh-at-startup "qs -c ~/source/qs/MyAwesomeShell"
 
@@ -660,6 +661,7 @@ binds {
 
     // The quit action will show a confirmation dialog to avoid accidental exits.
     Mod+Shift+E { quit; }
+    Mod+Ctrl+B { spawn "musicbg";}
     Mod+Shift+BackSpace {
     spawn "dms" "ipc" "call" "powermenu" "toggle"
 }    
@@ -674,3 +676,4 @@ binds {
 include "dms/cursor.kdl"
 
 include "dms/outputs.kdl"
+include "dms-theme-sync.kdl"
