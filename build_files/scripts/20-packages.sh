@@ -65,7 +65,7 @@ EOF
 ## ==========================================
 ## 3. APPLICAZIONI, UTILITY & XBOX DRIVERS
 ## ==========================================
-rum install -y --allowerasing \
+rum install -y --allowerasing --skip-broken --skip-unavailable\
     code \
     libvirt virt-manager qemu-kvm flatpak-builder wlr-randr \
     iotop sysstat lxqt-openssh-askpass lxpolkit parallel \
@@ -75,6 +75,7 @@ rum install -y --allowerasing \
     bluez-tools \
     nautilus \
     kitty \
+    ghostty \
     mpv \
     rfkill \
     gvfs \
