@@ -11,7 +11,7 @@ rum remove -y tuned-ppd || true
 ## ==========================================
 ## 2. STACK RAKUOS / NIRI / COMPONENTI DI SISTEMA
 ## ==========================================
-rum install -y --allowerasing \
+rum install -y --allowerasing --skip-broken --skip-unavailable\
     niri \
     xwayland-satellite \
     dms \
@@ -20,6 +20,7 @@ rum install -y --allowerasing \
     danksearch \
     quickshell \
     greetd \
+    cups-pk-helper \
     xdg-desktop-portal \
     xdg-desktop-portal-gnome \
     xdg-desktop-portal-gtk \
