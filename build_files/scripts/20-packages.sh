@@ -74,6 +74,7 @@ rum install -y --allowerasing --skip-broken --skip-unavailable\
     bluez \
     bluez-tools \
     nautilus \
+    kitty \
     ghostty \
     mpv \
     rfkill \
