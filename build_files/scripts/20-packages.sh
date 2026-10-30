@@ -11,7 +11,7 @@ rum remove -y tuned-ppd || true
 ## ==========================================
 ## 2. STACK RAKUOS / NIRI / COMPONENTI DI SISTEMA
 ## ==========================================
-rum install -y --allowerasing \
+rum install -y \
     niri \
     xwayland-satellite \
     dms \
