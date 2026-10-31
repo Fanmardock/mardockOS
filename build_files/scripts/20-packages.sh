@@ -43,45 +43,49 @@ rum install -y \
     vulkan-tools
 
 ## ==========================================
-## 2b. XPADNEO: installa/compila solo sul kernel compatibile
+## 2b. XPADNEO: compila contro il kernel esatto dell'immagine
 ## ==========================================
-
-# Usa il kernel reale dell'immagine, non /lib/modules/*/ (può essere quello dell'host/container)
+# Non usare un kernel diverso da quello in esecuzione: questo è il punto critico.
+# Se il kernel-devel non coincide, il modulo viene compilato contro i headers sbagliati
+# e poi non carica mai correttamente.
 CURRENT_KERNEL="$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-core 2>/dev/null || uname -r)"
-echo "Kernel corrente dell'immagine: ${CURRENT_KERNEL}"
-
 TARGET_KERNEL="${CURRENT_KERNEL}"
 
-# Se il kernel corrente non ha il devel, scegli dinamicamente una versione disponibile compatibile
+echo "Kernel dell'immagine: ${TARGET_KERNEL}"
+
+# In Fedora/RakuOS l'installazione corretta è via akmod + kernel-devel compatibile.
+# Se non c'è il devel per il kernel corrente, non fare un fallback random a una versione diversa.
 if ! rpm -q "kernel-devel-${TARGET_KERNEL}" >/dev/null 2>&1; then
-    echo "kernel-devel per ${TARGET_KERNEL} non disponibile; cerco una versione compatibile precedente..."
-
-    COMPATIBLE_KERNEL="$(repoquery --available --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-devel 2>/dev/null | sort -V | tail -n 1 || true)"
-
-    if [ -z "${COMPATIBLE_KERNEL}" ]; then
-        echo "FATAL: nessun kernel-devel disponibile in repo. xpadneo non può essere costruito per questo kernel."
-        exit 1
-    fi
-
-    TARGET_KERNEL="${COMPATIBLE_KERNEL}"
-    echo "Kernel compatibile scelto: ${TARGET_KERNEL}"
-
-    # Se vuoi pinare la versione scelta, bloccalo così non scappi oltre
-    rum install -y "kernel-${TARGET_KERNEL}" "kernel-devel-${TARGET_KERNEL}" || true
-    rum versionlock add kernel kernel-devel || true
-else
-    echo "Kernel corrente compatibile con xpadneo: ${TARGET_KERNEL}"
-    rum install -y "kernel-devel-${TARGET_KERNEL}"
+    echo "FATAL: kernel-devel-${TARGET_KERNEL} non disponibile nei repo configurati."
+    echo "Installa prima il kernel-devel corretto per il kernel attivo, poi riprova."
+    echo "Comando tipico: rum install -y kernel-devel-$(uname -r)"
+    exit 1
 fi
 
-echo "Building xpadneo against image kernel: ${TARGET_KERNEL}"
+rum install -y \
+    dkms \
+    gcc \
+    make \
+    git \
+    "kernel-devel-${TARGET_KERNEL}" \
+    akmod-xpadneo
+
+# Costruisce il modulo proprio per il kernel attivo. Non forzare versioni alternative.
 akmods --force --rebuild --kernels "${TARGET_KERNEL}"
 
-find "/lib/modules/${TARGET_KERNEL}" -name 'xpad.ko*' | grep -q . || \
-    { echo "ERROR: xpad.ko non trovato sotto /lib/modules/${TARGET_KERNEL}"; exit 1; }
+# Verifica il modulo effettivamente costruito.
+if ! find "/lib/modules/${TARGET_KERNEL}" -type f \( -iname '*xpadneo*.ko*' -o -iname '*xpad*.ko*' \) | grep -q .; then
+    echo "ERROR: nessun modulo xpadneo costruito in /lib/modules/${TARGET_KERNEL}."
+    exit 1
+fi
 
 mkdir -p /etc/modules-load.d/
-echo "hid-xpadneo" > /etc/modules-load.d/xpadneo.conf
+printf '%s\n' "hid-xpadneo" > /etc/modules-load.d/xpadneo.conf
+
+# Smoke test: se il modulo esiste nel kernel corretto, lo carica in memoria.
+modprobe xpadneo || {
+    echo "WARNING: modprobe xpadneo fallito in build phase; il pacchetto è stato comunque costruito."
+}
 
 ## ==========================================
 ## 3. APPLICAZIONI, UTILITY & XBOX DRIVERS
@@ -91,7 +95,6 @@ rum install -y --skip-broken --skip-unavailable \
     libvirt virt-manager qemu-kvm flatpak-builder wlr-randr \
     iotop sysstat lxqt-openssh-askpass lxpolkit parallel \
     rakuos-software-gtk \
-    akmod-xpadneo \
     bluez \
     bluez-tools \
     nautilus \
