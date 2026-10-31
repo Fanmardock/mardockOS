@@ -45,12 +45,13 @@ rum install -y \
 ## ==========================================
 ## 2b. XPADNEO: usa il kernel-devel reale del repo per l'immagine RakuOS
 ## ==========================================
-# Questo caso è speciale e va pinato in modo esplicito.
-# L'immagine in uso ha il kernel: 7.2.6-rakuos.3.v3.fc44.x86_64
-# Ma il repo RakuOS fornisce il devel con il nome: kernel-devel-7.2.6-200.fc44.x86_64
+# Il kernel dell'immagine RakuOS usa la nomenclatura del repo:
+#   7.2.6-rakuos.3.v3.fc44.x86_64
+# Il pacchetto devel corrispondente nel repo ha lo stesso suffisso, non il
+# nome stock Fedora: kernel-devel-7.2.6-rakuos.3.v3.fc44.x86_64
 # Quindi non usare uname -r o il nome dell'immagine per costruire il pacchetto devel.
 KERNEL_IMAGE_VERSION="${KERNEL_IMAGE_VERSION:-7.2.6-rakuos.3.v3.fc44.x86_64}"
-KERNEL_DEVEL_VERSION="${KERNEL_DEVEL_VERSION:-7.2.6-200.fc44.x86_64}"
+KERNEL_DEVEL_VERSION="${KERNEL_DEVEL_VERSION:-7.2.6-rakuos.3.v3.fc44.x86_64}"
 KERNEL_DEVEL_PKG="kernel-devel-${KERNEL_DEVEL_VERSION}"
 
 echo "Kernel immagine: ${KERNEL_IMAGE_VERSION}"
