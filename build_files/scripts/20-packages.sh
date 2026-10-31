@@ -43,22 +43,21 @@ rum install -y \
     vulkan-tools
 
 ## ==========================================
-## 2b. XPADNEO: compila contro il kernel esatto dell'immagine
+## 2b. XPADNEO: compila contro il kernel RPM esatto del sistema
 ## ==========================================
-# Non usare un kernel diverso da quello in esecuzione: questo è il punto critico.
-# Se il kernel-devel non coincide, il modulo viene compilato contro i headers sbagliati
-# e poi non carica mai correttamente.
-CURRENT_KERNEL="$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-core 2>/dev/null || uname -r)"
-TARGET_KERNEL="${CURRENT_KERNEL}"
+# Importante:
+# su RakuOS/Fedora il nome del pacchetto kernel-devel NON è uguale a uname -r.
+# Bisogna usare il nome RPM del kernel-core, cioè VERSION-RELEASE.ARCH.
+KERNEL_RPM="$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-core 2>/dev/null || uname -r)"
+KERNEL_DEVEL_PKG="kernel-devel-${KERNEL_RPM}"
 
-echo "Kernel dell'immagine: ${TARGET_KERNEL}"
+echo "Kernel RPM del sistema: ${KERNEL_RPM}"
+echo "Kernel-devel richiesto: ${KERNEL_DEVEL_PKG}"
 
-# In Fedora/RakuOS l'installazione corretta è via akmod + kernel-devel compatibile.
-# Se non c'è il devel per il kernel corrente, non fare un fallback random a una versione diversa.
-if ! rpm -q "kernel-devel-${TARGET_KERNEL}" >/dev/null 2>&1; then
-    echo "FATAL: kernel-devel-${TARGET_KERNEL} non disponibile nei repo configurati."
-    echo "Installa prima il kernel-devel corretto per il kernel attivo, poi riprova."
-    echo "Comando tipico: rum install -y kernel-devel-$(uname -r)"
+if ! rpm -q "${KERNEL_DEVEL_PKG}" >/dev/null 2>&1; then
+    echo "FATAL: ${KERNEL_DEVEL_PKG} non è presente nel repo di RakuOS."
+    echo "Il repo non ha ancora il kernel-devel compatibile per il kernel attuale."
+    echo "Non usare un kernel diverso: il modulo deve essere costruito contro il kernel esatto."
     exit 1
 fi
 
@@ -67,24 +66,24 @@ rum install -y \
     gcc \
     make \
     git \
-    "kernel-devel-${TARGET_KERNEL}" \
+    "${KERNEL_DEVEL_PKG}" \
     akmod-xpadneo
 
-# Costruisce il modulo proprio per il kernel attivo. Non forzare versioni alternative.
-akmods --force --rebuild --kernels "${TARGET_KERNEL}"
+# Costruzione del modulo contro il kernel preciso dell'immagine.
+akmods --force --rebuild --kernels "${KERNEL_RPM}"
 
-# Verifica il modulo effettivamente costruito.
-if ! find "/lib/modules/${TARGET_KERNEL}" -type f \( -iname '*xpadneo*.ko*' -o -iname '*xpad*.ko*' \) | grep -q .; then
-    echo "ERROR: nessun modulo xpadneo costruito in /lib/modules/${TARGET_KERNEL}."
+# Verifica che il modulo sia realmente presente.
+if ! find "/lib/modules/${KERNEL_RPM}" -type f \( -iname '*xpadneo*.ko*' -o -iname '*xpad*.ko*' \) | grep -q .; then
+    echo "ERROR: nessun modulo xpadneo costruito in /lib/modules/${KERNEL_RPM}."
     exit 1
 fi
 
 mkdir -p /etc/modules-load.d/
 printf '%s\n' "hid-xpadneo" > /etc/modules-load.d/xpadneo.conf
 
-# Smoke test: se il modulo esiste nel kernel corretto, lo carica in memoria.
+# Prova il caricamento; se fallisce, il build è comunque corretto ma il kernel non ha ancora il modulo pronto.
 modprobe xpadneo || {
-    echo "WARNING: modprobe xpadneo fallito in build phase; il pacchetto è stato comunque costruito."
+    echo "WARNING: modprobe xpadneo fallito in build phase; il modulo è stato comunque costruito per il kernel corretto."
 }
 
 ## ==========================================
