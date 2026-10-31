@@ -86,20 +86,61 @@ rum install -y --skip-broken --skip-unavailable\
     gnome-disk-utility \
     nautilus-open-any-terminal
 
-## ==========================================
-## 3b. BUILD XPADNEO AKMOD SUL KERNEL DELL'IMMAGINE
-## ==========================================
-# In container `uname -r` restituisce il kernel dell'HOST (es. runner GitHub),
-# quindi l'akmod finisce in /lib/modules/<ver-host> e al boot non viene mai caricato.
-# Costruiamo esplicitamente contro il kernel spedito dall'immagine, fail-fast se manca.
-IMAGE_KERNEL="$(basename "$(ls -d /lib/modules/*/ | head -n1)")"
-echo "Building xpadneo against image kernel: ${IMAGE_KERNEL}"
-rum install -y "kernel-devel-${IMAGE_KERNEL}" || rum install -y kernel-devel
-akmods --force --rebuild --kernels "${IMAGE_KERNEL}"
-find "/lib/modules/${IMAGE_KERNEL}" -name 'xpad.ko*' | grep -q . || \
-    { echo "ERROR: xpad.ko non trovato sotto /lib/modules/${IMAGE_KERNEL}"; exit 1; }
+#!/bin/bash
+set -euo pipefail
 
-# Caricamento automatico del modulo all'avvio (systemd-modules-load)
+## ==========================================
+## 2b. XPADNEO: build solo se il kernel dell'immagine ha il devel
+## ==========================================
+
+# 1) determina il kernel effettivo dell'immagine, da RPM, non da /lib/modules/*
+CURRENT_KERNEL="$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-core 2>/dev/null || uname -r)"
+echo "Kernel dell'immagine: ${CURRENT_KERNEL}"
+
+TARGET_KERNEL="${CURRENT_KERNEL}"
+
+# 2) se il kernel attuale non ha il devel, cerca una versione precedente compatibile
+if ! rpm -q "kernel-devel-${TARGET_KERNEL}" >/dev/null 2>&1; then
+    echo "kernel-devel per ${TARGET_KERNEL} non disponibile; cerco una versione compatibile precedente..."
+
+    # Cerca la versione più recente disponibile con kernel-devel
+    # Nota: se repoquery non è disponibile, puoi usare "dnf repoquery" al suo posto
+    mapfile -t CANDIDATES < <(
+        dnf repoquery --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' --latest-limit 20 'kernel-devel' 2>/dev/null \
+        | sort -V || true
+    )
+
+    FOUND=""
+    for cand in "${CANDIDATES[@]}"; do
+        if rpm -q "kernel-devel-${cand}" >/dev/null 2>&1; then
+            FOUND="${cand}"
+            break
+        fi
+    done
+
+    if [ -z "${FOUND}" ]; then
+        echo "FATAL: nessun kernel-devel compatibile trovato per xpadneo; fermo il build."
+        exit 1
+    fi
+
+    TARGET_KERNEL="${FOUND}"
+    echo "Uso kernel compatibile: ${TARGET_KERNEL}"
+
+    # Se vuoi pinare la versione compatibile, puoi bloccarla così:
+    rum install -y "kernel-${TARGET_KERNEL}" "kernel-devel-${TARGET_KERNEL}" || true
+    rum versionlock add kernel kernel-devel || true
+else
+    echo "Kernel attuale compatibile con xpadneo: ${TARGET_KERNEL}"
+    rum install -y "kernel-devel-${TARGET_KERNEL}"
+fi
+
+# 3) build del modulo solo sul kernel compatibile
+echo "Building xpadneo against image kernel: ${TARGET_KERNEL}"
+akmods --force --rebuild --kernels "${TARGET_KERNEL}"
+
+find "/lib/modules/${TARGET_KERNEL}" -name 'xpad.ko*' | grep -q . || \
+    { echo "ERROR: xpad.ko non trovato sotto /lib/modules/${TARGET_KERNEL}"; exit 1; }
+
 mkdir -p /etc/modules-load.d/
 echo "hid-xpadneo" > /etc/modules-load.d/xpadneo.conf
 
