@@ -43,32 +43,48 @@ rum install -y \
     vulkan-tools
 
 ## ==========================================
-## 2b. XPADNEO: usa il pacchetto headers matching del kernel reale
+## 2b. XPADNEO: risolvi il pacchetto headers del kernel nel repo, NON a mano
 ## ==========================================
-# In questo ambiente il kernel di base / reale del repo non è sempre identico al
-# nome del pacchetto devel. Per il supporto DKMS/akmods bisogna usare il package
-# headers che matcha il kernel in uso, non costruire un nome a mano.
-#
-# Esempio corretto:
-#   kernel-devel-matched
-#
-# Il nome del package devel non sempre coincide con la stringa del kernel custom
-# usata nell'immagine (es. rakuos, v3, ecc.), quindi il pacchetto va cercato come
-# metapacchetto "matched" che risolve automaticamente la versione giusta.
+# La nomenclatura del kernel di base patchato da RakuOS non coincide sempre con il
+# nome del pacchetto headers del repo. Per questo non costruire un nome hardcoded
+# come kernel-devel-7.2.6-rakuos... o kernel-devel-matched a prescindere:
+# si deve rilevare il pacchetto effettivamente presente nel repo e usare quello.
 KERNEL_IMAGE_VERSION="${KERNEL_IMAGE_VERSION:-$(uname -r 2>/dev/null || echo 'unknown')}"
-KERNEL_DEVEL_PKG="${KERNEL_DEVEL_PKG:-kernel-devel-matched}"
 
-# Risolviamo la versione effettiva del package headers matching per il kernel del repo.
-KERNEL_DEVEL_VERSION="$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}' "${KERNEL_DEVEL_PKG}" 2>/dev/null || true)"
+detect_kernel_devel_pkg() {
+    local pkg
+    for pkg in kernel-devel-matched kernel-devel; do
+        if dnf repoquery --quiet --latest-limit 1 "${pkg}" >/dev/null 2>&1; then
+            dnf repoquery --latest-limit 1 --qf '%{name}-%{version}-%{release}.%{arch}' "${pkg}" | head -n 1
+            return 0
+        fi
+    done
 
-if [[ -z "${KERNEL_DEVEL_VERSION}" ]]; then
-    echo "FATAL: ${KERNEL_DEVEL_PKG} non è disponibile nel repo di RakuOS o non è un package headers matching valido."
+    local found
+    found="$(dnf repoquery --latest-limit 1 --qf '%{name}-%{version}-%{release}.%{arch}' 'kernel-devel*' 2>/dev/null | head -n 1 || true)"
+    if [[ -n "${found}" ]]; then
+        printf '%s\n' "${found}"
+        return 0
+    fi
+
+    return 1
+}
+
+KERNEL_DEVEL_PKG="$(detect_kernel_devel_pkg || true)"
+if [[ -z "${KERNEL_DEVEL_PKG}" ]]; then
+    echo "FATAL: nessun pacchetto kernel-devel disponibile nel repo di RakuOS."
+    echo "Controllo disponibili:"
+    dnf list --available 'kernel-devel*' 2>/dev/null || true
     exit 1
 fi
 
-if ! rpm -q "${KERNEL_DEVEL_PKG}" >/dev/null 2>&1; then
-    echo "FATAL: ${KERNEL_DEVEL_PKG} non è disponibile nel repo di RakuOS."
-    echo "Per questa pipeline il pacchetto headers deve essere quello che matcha il kernel attivo."
+KERNEL_DEVEL_VERSION="$(dnf repoquery --latest-limit 1 --qf '%{version}-%{release}.%{arch}' "${KERNEL_DEVEL_PKG}" 2>/dev/null | head -n 1 || true)"
+if [[ -z "${KERNEL_DEVEL_VERSION}" ]]; then
+    KERNEL_DEVEL_VERSION="${KERNEL_DEVEL_PKG#kernel-devel-}"
+fi
+
+if [[ -z "${KERNEL_DEVEL_VERSION}" ]]; then
+    echo "FATAL: impossibile risolvere la versione del kernel-devel per ${KERNEL_DEVEL_PKG}."
     exit 1
 fi
 
