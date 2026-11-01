@@ -43,82 +43,87 @@ rum install -y \
     vulkan-tools
 
 ## ==========================================
-## 2b. XPADNEO: usa il kernel-devel più recente disponibile nel repo
+## 2b. KERNEL / XPADNEO
 ## ==========================================
-# IMPORTANTE:
-# non usare uname -r, perché quel valore è del kernel del container/runner,
-# non del kernel che il repo sta supportando.
+# La regola corretta è:
+# - non usare uname -r
+# - non usare kernel-devel generico
+# - usare il pacchetto devel che corrisponde al kernel RakuOS v3 disponibile nel repo
 #
-# Il pacchetto corretto da installare e usare per akmods è il kernel-devel
-# più nuovo presente nel repository di RakuOS.
+# Esempio atteso:
+#   kernel-rakuos-v3-devel-7.3.0-rakuos.5.v3.fc44.x86_64
+#
+# Quindi il nome del devel viene ricavato dinamicamente dal repo, non dal runner.
 
-detect_latest_kernel_devel_pkg() {
+get_latest_rakuos_v3_devel_pkg() {
     local found
 
-    # Preferisco il pacchetto versionato, cioè kernel-devel-<ver>...
-    found="$(rum search --showduplicates kernel-devel 2>/dev/null || true)"
+    found="$(rum search --showduplicates 'kernel-rakuos-v3-devel' 2>/dev/null || true)"
     if [[ -n "${found}" ]]; then
         printf '%s\n' "${found}" \
-            | awk '/^kernel-devel-/ {print $1}' \
+            | awk '/^kernel-rakuos-v3-devel-/ {print $1}' \
             | sort -V \
             | tail -n1
         return 0
     fi
 
-    # Fallback: se ci fosse solo kernel-devel generico
-    found="$(rum search kernel-devel 2>/dev/null || true)"
+    found="$(rum search 'kernel-rakuos-v3-devel' 2>/dev/null || true)"
     if [[ -n "${found}" ]]; then
         printf '%s\n' "${found}" \
-            | awk '/^kernel-devel/ {print $1; exit}'
+            | awk '/^kernel-rakuos-v3-devel-/ {print $1; exit}'
         return 0
     fi
 
     return 1
 }
 
-KERNEL_DEVEL_PKG="$(detect_latest_kernel_devel_pkg || true)"
+KERNEL_DEVEL_PKG="$(get_latest_rakuos_v3_devel_pkg || true)"
 if [[ -z "${KERNEL_DEVEL_PKG}" ]]; then
-    echo "FATAL: nessun pacchetto kernel-devel disponibile nel repo di RakuOS."
+    echo "FATAL: nessun kernel-rakuos-v3-devel disponibile nel repo di RakuOS."
     echo "Controllo disponibili:"
-    rum search kernel-devel 2>/dev/null || true
+    rum search kernel-rakuos-v3-devel 2>/dev/null || true
     exit 1
 fi
 
-KERNEL_DEVEL_VERSION="$(rpm -q --qf '%{version}-%{release}.%{arch}' "${KERNEL_DEVEL_PKG}" 2>/dev/null || true)"
-if [[ -z "${KERNEL_DEVEL_VERSION}" ]]; then
-    echo "FATAL: impossibile risolvere la versione del kernel-devel per ${KERNEL_DEVEL_PKG}."
-    exit 1
-fi
+# Estrae la versione del kernel dal nome del pacchetto:
+# kernel-rakuos-v3-devel-7.3.0-rakuos.5.v3.fc44.x86_64
+# -> 7.3.0-rakuos.5.v3.fc44.x86_64
+KERNEL_VERSION="${KERNEL_DEVEL_PKG#kernel-rakuos-v3-devel-}"
 
-# In questo script il kernel da usare è quello del repo, non del sistema in esecuzione.
-KERNEL_IMAGE_VERSION="${KERNEL_DEVEL_VERSION}"
-
-echo "Kernel immagine (repo): ${KERNEL_IMAGE_VERSION}"
+echo "Kernel immagine (repo): ${KERNEL_VERSION}"
 echo "Kernel-devel del repo: ${KERNEL_DEVEL_PKG}"
 
+# Installazione base del kernel target
 rum install -y \
     dkms \
     gcc \
     make \
     git \
-    "${KERNEL_DEVEL_PKG}" \
-    xpadneo-akmod-modules
+    "${KERNEL_DEVEL_PKG}"
 
-# Costruzione del modulo contro il kernel-devel reale supportato dal repo.
-akmods --force --rebuild --kernels "${KERNEL_DEVEL_VERSION}"
-
-# Verifica modulo generato per il kernel reale del repo.
-if ! find "/lib/modules/${KERNEL_DEVEL_VERSION}" -type f \( -iname '*xpadneo*.ko*' -o -iname '*xpad*.ko*' \) | grep -q .; then
-    echo "ERROR: nessun modulo xpadneo costruito in /lib/modules/${KERNEL_DEVEL_VERSION}."
-    exit 1
+# xpadneo: installa solo se il repo lo fornisce
+XPADNEO_AVAILABLE=0
+if rum search --showduplicates 'xpadneo-akmod-modules' >/dev/null 2>&1; then
+    XPADNEO_AVAILABLE=1
 fi
 
-mkdir -p /etc/modules-load.d/
-printf '%s\n' "hid-xpadneo" > /etc/modules-load.d/xpadneo.conf
+if [[ "${XPADNEO_AVAILABLE}" -eq 1 ]]; then
+    echo "Installazione xpadneo-akmod-modules..."
+    rum install -y xpadneo-akmod-modules
 
-modprobe xpadneo || {
-    echo "WARNING: modprobe xpadneo fallito in questa fase; il modulo è stato comunque costruito per il kernel corretto del repo."
-}
+    akmods --force --rebuild --kernels "${KERNEL_VERSION}"
+
+    if find "/lib/modules/${KERNEL_VERSION}" -type f \( -iname '*xpadneo*.ko*' -o -iname '*xpad*.ko*' \) | grep -q .; then
+        echo "Modulo xpadneo costruito per il kernel ${KERNEL_VERSION}"
+        mkdir -p /etc/modules-load.d/
+        printf '%s\n' "hid-xpadneo" > /etc/modules-load.d/xpadneo.conf
+        modprobe xpadneo || true
+    else
+        echo "WARN: modulo xpadneo non trovato in /lib/modules/${KERNEL_VERSION}; skip."
+    fi
+else
+    echo "WARN: xpadneo-akmod-modules non disponibile nel repo attuale; skip del driver xpadneo."
+fi
 
 ## ==========================================
 ## 3. APPLICAZIONI, UTILITY & XBOX DRIVERS
@@ -151,6 +156,6 @@ echo "options bluetooth disable_ertm=1" > /etc/modprobe.d/bluetooth-xbox.conf
 echo "options usbcore autosuspend=-1" | tee /etc/modprobe.d/disable-autosuspend.conf
 
 ## ==========================================
-## 5. PULIZIA PACCHETTI IN ECESSO
+## 5. PULIZIA PACCHETTI IN ECCESSO
 ## ==========================================
 rum remove -y waybar swaylock alacritty cosmic-comp cosmic-initial-setup cosmic-settings || true
