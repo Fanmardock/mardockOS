@@ -32,34 +32,5 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/build.sh
 
-### FIX FOR bootc CONTAINER LINT
-# bootc richiede che i symlink restino dentro il rootfs.
-# Se un path punta fuori dal filesystem (es. /usr/sbin/chcon -> /etc/alternatives/chcon
-# oppure un symlink esterno al rootfs), il lint fallisce con:
-# "a path led outside of the filesystem"
-RUN set -eux; \
-    # Rimuove symlink rotti o che puntano fuori dal rootfs
-    find /usr /bin /sbin -xdev -type l -print0 | while IFS= read -r -d '' link; do \
-        target="$(readlink "$link" 2>/dev/null || true)"; \
-        case "$target" in \
-            /|/usr/*|/bin/*|/sbin/*|/etc/*|/var/*|/opt/*|/lib*|/root*|/home*) ;; \
-            *) rm -f "$link" ;; \
-        esac; \
-    done; \
-    # Garantisce che chcon sia dentro al rootfs
-    if [ -e /usr/bin/chcon ] && [ ! -e /usr/sbin/chcon ]; then \
-        ln -sf ../bin/chcon /usr/sbin/chcon; \
-    fi; \
-    # Se esiste ma punta fuori dal rootfs, lo corregge
-    if [ -L /usr/sbin/chcon ]; then \
-        resolved="$(readlink -f /usr/sbin/chcon 2>/dev/null || true)"; \
-        case "$resolved" in \
-            /usr/*|/bin/*|/sbin/*) ;; \
-            *) rm -f /usr/sbin/chcon; ln -sf ../bin/chcon /usr/sbin/chcon ;; \
-        esac; \
-    fi; \
-    # Verifica finale: chcon deve risolvere dentro il rootfs
-    realpath /usr/sbin/chcon >/dev/null 2>&1 || exit 1
-
 ### LINTING
 RUN bootc container lint
