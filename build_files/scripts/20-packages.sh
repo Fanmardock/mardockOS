@@ -43,25 +43,37 @@ rum install -y \
     vulkan-tools
 
 ## ==========================================
-## 2b. XPADNEO: usa il kernel-devel reale del repo per l'immagine RakuOS
+## 2b. XPADNEO: usa il pacchetto headers matching del kernel reale
 ## ==========================================
-# Il kernel dell'immagine RakuOS usa la nomenclatura del repo:
-#   7.2.6-rakuos.3.v3.fc44.x86_64
-# Il pacchetto devel corrispondente nel repo ha lo stesso suffisso, non il
-# nome stock Fedora: kernel-devel-7.2.6-rakuos.3.v3.fc44.x86_64
-# Quindi non usare uname -r o il nome dell'immagine per costruire il pacchetto devel.
-KERNEL_IMAGE_VERSION="${KERNEL_IMAGE_VERSION:-7.2.6-rakuos.3.v3.fc44.x86_64}"
-KERNEL_DEVEL_VERSION="${KERNEL_DEVEL_VERSION:-7.2.6-rakuos.3.v3.fc44.x86_64}"
-KERNEL_DEVEL_PKG="kernel-devel-${KERNEL_DEVEL_VERSION}"
+# In questo ambiente il kernel di base / reale del repo non è sempre identico al
+# nome del pacchetto devel. Per il supporto DKMS/akmods bisogna usare il package
+# headers che matcha il kernel in uso, non costruire un nome a mano.
+#
+# Esempio corretto:
+#   kernel-devel-matched
+#
+# Il nome del package devel non sempre coincide con la stringa del kernel custom
+# usata nell'immagine (es. rakuos, v3, ecc.), quindi il pacchetto va cercato come
+# metapacchetto "matched" che risolve automaticamente la versione giusta.
+KERNEL_IMAGE_VERSION="${KERNEL_IMAGE_VERSION:-$(uname -r 2>/dev/null || echo 'unknown')}"
+KERNEL_DEVEL_PKG="${KERNEL_DEVEL_PKG:-kernel-devel-matched}"
 
-echo "Kernel immagine: ${KERNEL_IMAGE_VERSION}"
-echo "Kernel-devel del repo: ${KERNEL_DEVEL_PKG}"
+# Risolviamo la versione effettiva del package headers matching per il kernel del repo.
+KERNEL_DEVEL_VERSION="$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}' "${KERNEL_DEVEL_PKG}" 2>/dev/null || true)"
+
+if [[ -z "${KERNEL_DEVEL_VERSION}" ]]; then
+    echo "FATAL: ${KERNEL_DEVEL_PKG} non è disponibile nel repo di RakuOS o non è un package headers matching valido."
+    exit 1
+fi
 
 if ! rpm -q "${KERNEL_DEVEL_PKG}" >/dev/null 2>&1; then
     echo "FATAL: ${KERNEL_DEVEL_PKG} non è disponibile nel repo di RakuOS."
-    echo "Per questa pipeline il devel deve essere presente esattamente in questa versione."
+    echo "Per questa pipeline il pacchetto headers deve essere quello che matcha il kernel attivo."
     exit 1
 fi
+
+echo "Kernel immagine: ${KERNEL_IMAGE_VERSION}"
+echo "Kernel-devel del repo: ${KERNEL_DEVEL_PKG} (${KERNEL_DEVEL_VERSION})"
 
 rum install -y \
     dkms \
