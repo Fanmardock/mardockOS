@@ -43,25 +43,29 @@ rum install -y \
     vulkan-tools
 
 ## ==========================================
-## 2b. XPADNEO: risolvi il pacchetto headers del kernel nel repo, NON a mano
+## 2b. XPADNEO: rileva il pacchetto headers reale dal repo con rum search
 ## ==========================================
-# La nomenclatura del kernel di base patchato da RakuOS non coincide sempre con il
-# nome del pacchetto headers del repo. Per questo non costruire un nome hardcoded
-# come kernel-devel-7.2.6-rakuos... o kernel-devel-matched a prescindere:
-# si deve rilevare il pacchetto effettivamente presente nel repo e usare quello.
+# NON usare hardcoded names o dnf repoquery: il nome reale dipende dal repo e va
+# rilevato con la ricerca del package manager del sistema (rum search).
 KERNEL_IMAGE_VERSION="${KERNEL_IMAGE_VERSION:-$(uname -r 2>/dev/null || echo 'unknown')}"
 
 detect_kernel_devel_pkg() {
-    local pkg
-    for pkg in kernel-devel-matched kernel-devel; do
-        if dnf repoquery --quiet --latest-limit 1 "${pkg}" >/dev/null 2>&1; then
-            dnf repoquery --latest-limit 1 --qf '%{name}-%{version}-%{release}.%{arch}' "${pkg}" | head -n 1
-            return 0
-        fi
-    done
-
+    local line
     local found
-    found="$(dnf repoquery --latest-limit 1 --qf '%{name}-%{version}-%{release}.%{arch}' 'kernel-devel*' 2>/dev/null | head -n 1 || true)"
+
+    found="$(rum search --showduplicates kernel-devel 2>/dev/null || true)"
+    if [[ -n "${found}" ]]; then
+        while IFS= read -r line; do
+            case "${line}" in
+                kernel-devel*|kernel-devel-*)
+                    printf '%s\n' "${line%%.*}"
+                    return 0
+                    ;;
+            esac
+        done <<< "${found}"
+    fi
+
+    found="$(rum search kernel-devel 2>/dev/null | awk '/^kernel-devel/ {print $1; exit}' || true)"
     if [[ -n "${found}" ]]; then
         printf '%s\n' "${found}"
         return 0
@@ -74,22 +78,12 @@ KERNEL_DEVEL_PKG="$(detect_kernel_devel_pkg || true)"
 if [[ -z "${KERNEL_DEVEL_PKG}" ]]; then
     echo "FATAL: nessun pacchetto kernel-devel disponibile nel repo di RakuOS."
     echo "Controllo disponibili:"
-    dnf list --available 'kernel-devel*' 2>/dev/null || true
-    exit 1
-fi
-
-KERNEL_DEVEL_VERSION="$(dnf repoquery --latest-limit 1 --qf '%{version}-%{release}.%{arch}' "${KERNEL_DEVEL_PKG}" 2>/dev/null | head -n 1 || true)"
-if [[ -z "${KERNEL_DEVEL_VERSION}" ]]; then
-    KERNEL_DEVEL_VERSION="${KERNEL_DEVEL_PKG#kernel-devel-}"
-fi
-
-if [[ -z "${KERNEL_DEVEL_VERSION}" ]]; then
-    echo "FATAL: impossibile risolvere la versione del kernel-devel per ${KERNEL_DEVEL_PKG}."
+    rum search kernel-devel 2>/dev/null || true
     exit 1
 fi
 
 echo "Kernel immagine: ${KERNEL_IMAGE_VERSION}"
-echo "Kernel-devel del repo: ${KERNEL_DEVEL_PKG} (${KERNEL_DEVEL_VERSION})"
+echo "Kernel-devel del repo: ${KERNEL_DEVEL_PKG}"
 
 rum install -y \
     dkms \
@@ -98,6 +92,12 @@ rum install -y \
     git \
     "${KERNEL_DEVEL_PKG}" \
     akmod-xpadneo
+
+KERNEL_DEVEL_VERSION="$(rpm -q --qf '%{version}-%{release}.%{arch}' "${KERNEL_DEVEL_PKG}" 2>/dev/null || true)"
+if [[ -z "${KERNEL_DEVEL_VERSION}" ]]; then
+    echo "FATAL: impossibile risolvere la versione del kernel-devel per ${KERNEL_DEVEL_PKG}."
+    exit 1
+fi
 
 # Costruzione del modulo contro il kernel-devel reale supportato dal repo.
 akmods --force --rebuild --kernels "${KERNEL_DEVEL_VERSION}"
