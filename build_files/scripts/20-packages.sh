@@ -91,7 +91,7 @@ rum install -y \
     make \
     git \
     "${KERNEL_DEVEL_PKG}" \
-    akmod-xpadneo
+    xpadneo-akmod-modules
 
 KERNEL_DEVEL_VERSION="$(rpm -q --qf '%{version}-%{release}.%{arch}' "${KERNEL_DEVEL_PKG}" 2>/dev/null || true)"
 if [[ -z "${KERNEL_DEVEL_VERSION}" ]]; then
