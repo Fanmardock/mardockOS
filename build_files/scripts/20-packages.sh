@@ -93,13 +93,13 @@ KERNEL_VERSION="${KERNEL_DEVEL_PKG#kernel-rakuos-v3-devel-}"
 echo "Kernel immagine (repo): ${KERNEL_VERSION}"
 echo "Kernel-devel del repo: ${KERNEL_DEVEL_PKG}"
 
-# Installazione base del kernel target
-rum install -y \
-    dkms \
-    gcc \
-    make \
-    git \
-    "${KERNEL_DEVEL_PKG}"
+rum install -y dkms gcc make git
+
+if ! rpm -q --quiet "${KERNEL_DEVEL_PKG}"; then
+    rum install -y "${KERNEL_DEVEL_PKG}"
+else
+    echo "${KERNEL_DEVEL_PKG} already installed; skipping"
+fi
 
 # xpadneo: installa solo se il repo lo fornisce
 XPADNEO_AVAILABLE=0
