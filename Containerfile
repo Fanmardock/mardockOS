@@ -32,9 +32,10 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/build.sh
 
-# Clean runtime-only state and any broken symlinks left by package installs;
-# bootc lints treat /run, /tmp and outside-root symlinks as invalid in the final image.
-RUN rm -rf /run/* /tmp/* /var/tmp/* /run/gluster && \
+# Do not remove /run during the build: Buildah mounts runtime state there and
+# deleting it can fail with "Device or resource busy". Keep cleanup to transient
+# directories only and remove broken symlinks left by package installs.
+RUN rm -rf /tmp/* /var/tmp/* && \
     find /usr/sbin /usr/bin -maxdepth 1 -type l -exec sh -c 'for p do t=$(readlink "$p" 2>/dev/null || true); case "$t" in /*) [ -e "$t" ] || rm -f "$p" ;; esac; done' sh {} + && \
     if [ -L /usr/sbin/chcon ]; then rm -f /usr/sbin/chcon; fi && \
     if [ -L /usr/bin/chcon ]; then rm -f /usr/bin/chcon; fi && \
