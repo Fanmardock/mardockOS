@@ -33,7 +33,6 @@ rum upgrade -y --allowerasing "mesa-*" || true
 # Installazione completa driver, supporto ROCm Compute e utility AMD
 rum install -y --allowerasing \
     linux-firmware \
-    mesa-freeworld \
     mesa-va-drivers-freeworld \
     mesa-vdpau-drivers-freeworld \
     rocm-opencl \
