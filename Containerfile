@@ -32,13 +32,14 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/build.sh
 
-# Do not remove /run during the build: Buildah mounts runtime state there and
-# deleting it can fail with "Device or resource busy". Keep cleanup to transient
-# directories only and remove broken symlinks left by package installs.
-RUN rm -rf /tmp/* /var/tmp/* && \
+# bootc runtime validation expects /run and /tmp to be empty in the final image.
+# Remove transient runtime state created during package installs and drop any
+# external symlinks that escape the image root (e.g. chcon -> /usr/bin/chcon).
+RUN rm -rf /run/* /tmp/* /var/tmp/* && \
     find /usr/sbin /usr/bin -maxdepth 1 -type l -exec sh -c 'for p do t=$(readlink "$p" 2>/dev/null || true); case "$t" in /*) [ -e "$t" ] || rm -f "$p" ;; esac; done' sh {} + && \
-    if [ -L /usr/sbin/chcon ]; then rm -f /usr/sbin/chcon; fi && \
-    if [ -L /usr/bin/chcon ]; then rm -f /usr/bin/chcon; fi && \
+    for p in /usr/sbin/chcon /usr/bin/chcon; do [ -L "$p" ] && rm -f "$p"; done && \
+    mkdir -p /run /tmp /var/tmp && \
+    chmod 1777 /tmp /var/tmp && \
     true
 
 ### LINTING
