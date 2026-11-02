@@ -32,10 +32,10 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/build.sh
 
-# bootc runtime validation expects /run and /tmp to be empty in the final image.
-# Remove transient runtime state created during package installs and drop any
-# external symlinks that escape the image root (e.g. chcon -> /usr/bin/chcon).
-RUN rm -rf /run/* /tmp/* /var/tmp/* && \
+# bootc lint is strict about runtime-only directories. Remove only the known
+# transient runtime content created during package installation and leave the
+# systemd-managed /run entries alone; deleting /run/* triggers "Device or resource busy".
+RUN rm -rf /run/gluster /tmp/* /var/tmp/* && \
     find /usr/sbin /usr/bin -maxdepth 1 -type l -exec sh -c 'for p do t=$(readlink "$p" 2>/dev/null || true); case "$t" in /*) [ -e "$t" ] || rm -f "$p" ;; esac; done' sh {} + && \
     for p in /usr/sbin/chcon /usr/bin/chcon; do [ -L "$p" ] && rm -f "$p"; done && \
     mkdir -p /run /tmp /var/tmp && \
