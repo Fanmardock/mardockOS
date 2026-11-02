@@ -95,6 +95,10 @@ cp -rf /ctx/dot_config/niri/. /etc/skel/.config/niri/
 mkdir -p /etc/skel/.config/kitty/
 cp -rf /ctx/dot_config/kitty/. /etc/skel/.config/kitty/
 
+# Copia Ghostty Config di Default
+mkdir -p /etc/skel/.config/ghostty/
+cp -rf /ctx/dot_config/ghostty/. /etc/skel/.config/ghostty/
+
 # Provisioning Flatpak
 cat > /usr/lib/systemd/system/flatpak-provisioning.service << 'UNIT'
 [Unit]
