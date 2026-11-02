@@ -32,15 +32,14 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/build.sh
 
-# bootc lint is strict about runtime-only directories. Remove only the known
-# transient runtime content created during package installation and leave the
-# systemd-managed /run entries alone; deleting /run/* triggers "Device or resource busy".
-RUN rm -rf /run/gluster /tmp/* /var/tmp/* && \
-    find /usr/sbin /usr/bin -maxdepth 1 -type l -exec sh -c 'for p do t=$(readlink "$p" 2>/dev/null || true); case "$t" in /*) [ -e "$t" ] || rm -f "$p" ;; esac; done' sh {} + && \
-    for p in /usr/sbin/chcon /usr/bin/chcon; do [ -L "$p" ] && rm -f "$p"; done && \
+# bootc lint rejects stale runtime state; keep the cleanup narrow and safe.
+# We only delete the known gluster runtime dir and any broken chcon symlinks,
+# without touching the systemd-managed files under /run.
+RUN rm -rf /run/gluster /tmp/* /var/tmp/* || true && \
+    [ -L /usr/sbin/chcon ] && rm -f /usr/sbin/chcon || true && \
+    [ -L /usr/bin/chcon ] && rm -f /usr/bin/chcon || true && \
     mkdir -p /run /tmp /var/tmp && \
-    chmod 1777 /tmp /var/tmp && \
-    true
+    chmod 1777 /tmp /var/tmp
 
 ### LINTING
 RUN bootc container lint
