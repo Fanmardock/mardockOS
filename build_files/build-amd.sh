@@ -33,8 +33,7 @@ rum upgrade -y --allowerasing "mesa-*" || true
 # Installazione completa driver, supporto ROCm Compute e utility AMD
 rum install -y --allowerasing --skip-broken --skip-unavailable\
     linux-firmware \
-    mesa-va-drivers-freeworld \
-    mesa-vdpau-drivers-freeworld \
+    mesa-dri-drivers\
     rocm-opencl \
     rocm-smi \
     radeontop
