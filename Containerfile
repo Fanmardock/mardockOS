@@ -32,6 +32,9 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/build.sh
 
+# Install after build scripts so this configuration cannot be overwritten by them.
+COPY --from=ctx /usr/lib/bootc/kargs.d/10-rakuos.toml /usr/lib/bootc/kargs.d/10-rakuos.toml
+
 # bootc lint rejects stale runtime state; keep the cleanup narrow and safe.
 # We only delete the known gluster runtime dir and any broken chcon symlinks,
 # without touching the systemd-managed files under /run.
