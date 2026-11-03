@@ -1,4 +1,4 @@
-# Global build arg - available to all FROM lines for image tag resolution.
+# Global build arg - available to all FROM lines.
 # Must NOT have ENV here; ENV is a layer instruction and cannot precede FROM.
 ARG BASE_IMAGE_TAG="${BASE_IMAGE_TAG:-latest}"
 ARG BASE_IMAGE_REPO="quay.io/rakuos/rakuos-base-v3"
@@ -31,6 +31,9 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/log \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/build-amd.sh
+
+# Install after build scripts so this configuration cannot be overwritten by them.
+COPY --from=ctx /usr/lib/bootc/kargs.d/10-rakuos.toml /usr/lib/bootc/kargs.d/10-rakuos.toml
 
 # bootc lint rejects stale runtime state; keep the cleanup narrow and safe.
 # We only delete the known gluster runtime dir and any broken chcon symlinks,
