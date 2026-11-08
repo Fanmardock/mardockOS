@@ -45,4 +45,15 @@ fi
 rm -f /etc/systemd/system/display-manager.service
 systemctl enable --force greetd.service
 
+## ==========================================
+# 6. Rimozione integrazione Nix non utilizzata
+#    (nix.mount e rakuos-nix.conf vengono forniti dai pacchetti base
+#     rakuos-core / rakuos-settings; il package manager nix non viene
+#     installato, quindi si eliminano i residui: mount di /nix e le
+#     cartelle vuote create da tmpfiles)
+## ==========================================
+systemctl mask nix.mount 2>/dev/null || ln -sf /dev/null /etc/systemd/system/nix.mount
+rm -f /usr/lib/tmpfiles.d/rakuos-nix.conf || true
+rmdir /nix /var/nix /var/lib/nix 2>/dev/null || true
+
 echo "=== Configurazione systemd completata ==="
