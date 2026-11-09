@@ -8,7 +8,8 @@ mkdir -p /etc/greetd/
 
 cat > /etc/greetd/config.toml << 'EOF'
 [terminal]
-vt = "next"
+# kmscon occupies tty2-tty6 on this image; reserve tty1 for the greeter.
+vt = 1
 
 [default_session]
 user = "greeter"
@@ -19,12 +20,12 @@ chmod 0755 /etc/greetd
 chmod 0644 /etc/greetd/config.toml
 chown -R root:root /etc/greetd
 
-# 2. Configurazione permessi e utenti per il greeter
+# 2. Configurazione permessi per l'utente greeter, creato dal pacchetto dms-greeter.
+# Evita di ridefinire l'utente: sysusers segnala conflitto con dms-greeter.conf.
 mkdir -p /usr/lib/sysusers.d/
 cat > /usr/lib/sysusers.d/greetd.conf << 'EOF'
 g video 44 -
 g render 989 -
-u greeter - "Greetd Greeter" - /usr/sbin/nologin
 m greeter video
 m greeter render
 EOF
