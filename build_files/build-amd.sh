@@ -34,7 +34,6 @@ rum upgrade -y --allowerasing "mesa-*" || true
 rum install -y --allowerasing --skip-broken --skip-unavailable\
     linux-firmware \
     mesa-dri-drivers \
-    mesa-vulkan-drivers \
     amd-gpu-firmware \
     amd-ucode-firmware \
     rocm-opencl \
