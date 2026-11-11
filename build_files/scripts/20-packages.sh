@@ -33,6 +33,7 @@ rum install -y \
     wireplumber \
     pavucontrol \
     blueman \
+    zenity \
     ddcutil \
     adw-gtk3-theme \
     qt6ct \
