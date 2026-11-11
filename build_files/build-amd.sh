@@ -33,7 +33,6 @@ rum upgrade -y --allowerasing "mesa-*" || true
 # Installazione completa driver, supporto ROCm Compute e utility AMD
 rum install -y --allowerasing --skip-broken --skip-unavailable\
     linux-firmware \
-    mesa-dri-drivers \
     amd-gpu-firmware \
     amd-ucode-firmware \
     rocm-opencl \
