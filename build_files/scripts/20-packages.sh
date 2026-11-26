@@ -17,6 +17,7 @@ rum install -y \
     dankcalendar-git \
     danksearch \
     quickshell \
+    dux-qt-base \
     greetd \
     cups-pk-helper \
     xdg-desktop-portal \
