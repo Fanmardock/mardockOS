@@ -251,7 +251,7 @@ Runs shfmt on all Bash scripts.
 
 ## Additional resources
 
-For additional driver support, ublue maintains a set of scripts and container images available at [ublue-akmod](https://github.com/ublue-os/akmods). These images include the necessary scripts to install multiple kernel drivers within the container (Nvidia, OpenRazer, Framework...). The documentation provides guidance on how to properly integrate these drivers into your container image.
+Per i driver out-of-tree seguire il modello RakuOS: i moduli vengono costruiti e firmati da RakuOS e distribuiti come pacchetti `rakuos-kmod-*`, non compilati nell'immagine con akmods/DKMS. mardockOS installa `rakuos-kmod-xpadneo` dal repo Terra. Vedi [Drivers and Secure Boot](https://rakuos.org/documentation/drivers-and-secure-boot).
 
 ## Community Examples
 

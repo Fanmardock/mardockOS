@@ -45,87 +45,36 @@ rum install -y \
     vulkan-tools
 
 ## ==========================================
-## 2b. KERNEL / XPADNEO
+## 2b. XPADNEO: modulo firmato RakuOS
 ## ==========================================
-# La regola corretta è:
-# - non usare uname -r
-# - non usare kernel-devel generico
-# - usare il pacchetto devel che corrisponde al kernel RakuOS v3 disponibile nel repo
+# RakuOS non compila i driver out-of-tree dentro l'immagine: i moduli sono
+# costruiti e firmati da RakuOS e pubblicati come pacchetti rakuos-kmod-*.
+# rum installa automaticamente il build corretto per il kernel dell'immagine
+# (label org.rakuos.kernel.release), quindi:
+#   - non usare uname -r: è il kernel del runner, non quello dell'immagine
+#   - non installare kernel-devel, akmods, dkms, gcc o make
+#   - non ricavare la versione del kernel dal nome di un pacchetto devel
+#   - non lanciare akmods --force --rebuild --kernels ...
 #
-# Esempio atteso:
-#   kernel-rakuos-v3-devel-7.3.0-rakuos.5.v3.fc44.x86_64
-#
-# Quindi il nome del devel viene ricavato dinamicamente dal repo, non dal runner.
+# xpadneo richiede il repo Terra (il suo pacchetto fornisce
+# xpadneo-kmod-common). terra-release è nell'immagine base, ma il repo è
+# disabilitato di default.
 
-get_latest_rakuos_v3_devel_pkg() {
-    local found
-
-    found="$(rum search --showduplicates 'kernel-rakuos-v3-devel' 2>/dev/null || true)"
-    if [[ -n "${found}" ]]; then
-        printf '%s\n' "${found}" \
-            | awk '/^kernel-rakuos-v3-devel-/ {print $1}' \
-            | sort -V \
-            | tail -n1
-        return 0
-    fi
-
-    found="$(rum search 'kernel-rakuos-v3-devel' 2>/dev/null || true)"
-    if [[ -n "${found}" ]]; then
-        printf '%s\n' "${found}" \
-            | awk '/^kernel-rakuos-v3-devel-/ {print $1; exit}'
-        return 0
-    fi
-
-    return 1
-}
-
-KERNEL_DEVEL_PKG="$(get_latest_rakuos_v3_devel_pkg || true)"
-if [[ -z "${KERNEL_DEVEL_PKG}" ]]; then
-    echo "FATAL: nessun kernel-rakuos-v3-devel disponibile nel repo di RakuOS."
-    echo "Controllo disponibili:"
-    rum search kernel-rakuos-v3-devel 2>/dev/null || true
+if ! rum repolist --all 2>/dev/null | awk '$1 == "terra" { found = 1 } END { exit !found }'; then
+    echo "FATAL: repo Terra assente dall'immagine base: impossibile installare rakuos-kmod-xpadneo."
+    rum repolist --all 2>/dev/null || true
     exit 1
 fi
 
-# Estrae la versione del kernel dal nome del pacchetto:
-# kernel-rakuos-v3-devel-7.3.0-rakuos.5.v3.fc44.x86_64
-# -> 7.3.0-rakuos.5.v3.fc44.x86_64
-KERNEL_VERSION="${KERNEL_DEVEL_PKG#kernel-rakuos-v3-devel-}"
+rum config-manager --set-enabled terra
 
-echo "Kernel immagine (repo): ${KERNEL_VERSION}"
-echo "Kernel-devel del repo: ${KERNEL_DEVEL_PKG}"
+# Fail-fast: senza il modulo firmato l'immagine non è completa.
+# Nessun controllo "find /lib/modules/..." e nessun modprobe: in fase di build
+# agirebbero sul kernel del runner, non su quello dell'immagine.
+rum install -y rakuos-kmod-xpadneo
 
-rum install -y dkms gcc make git
-
-if ! rpm -q --quiet "${KERNEL_DEVEL_PKG}"; then
-    rum install -y "${KERNEL_DEVEL_PKG}"
-else
-    echo "${KERNEL_DEVEL_PKG} already installed; skipping"
-fi
-
-# xpadneo: installa solo se il repo lo fornisce
-XPADNEO_AVAILABLE=0
-if rum search --showduplicates 'xpadneo-akmod-modules' >/dev/null 2>&1; then
-    XPADNEO_AVAILABLE=1
-fi
-
-if [[ "${XPADNEO_AVAILABLE}" -eq 1 ]]; then
-    echo "Installazione xpadneo-akmod-modules..."
-    rum install -y xpadneo-akmod-modules
-
-    akmods --force --rebuild --kernels "${KERNEL_VERSION}"
-
-    if find "/lib/modules/${KERNEL_VERSION}" -type f \( -iname '*xpadneo*.ko*' -o -iname '*xpad*.ko*' \) | grep -q .; then
-        echo "Modulo xpadneo costruito per il kernel ${KERNEL_VERSION}"
-        mkdir -p /etc/modules-load.d/
-        printf '%s\n' "hid-xpadneo" > /etc/modules-load.d/xpadneo.conf
-        modprobe xpadneo || true
-    else
-        echo "WARN: modulo xpadneo non trovato in /lib/modules/${KERNEL_VERSION}; skip."
-    fi
-else
-    echo "WARN: xpadneo-akmod-modules non disponibile nel repo attuale; skip del driver xpadneo."
-fi
+mkdir -p /etc/modules-load.d/
+printf '%s\n' 'hid-xpadneo' > /etc/modules-load.d/xpadneo.conf
 
 ## ==========================================
 ## 3. APPLICAZIONI, UTILITY & XBOX DRIVERS
