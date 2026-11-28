@@ -112,10 +112,11 @@ if [[ -f /usr/share/rakuos/protected-packages.txt ]]; then
   niri
   xwayland-satellite
   dms
-  dms-greeter
-  dankcalendar-git
-  danksearch
+  dux-greeter
+  dux-calendar-git
+  dux-search
   quickshell
+  dux-qt-base-git
   greetd
   kitty
   mpv

@@ -9,15 +9,24 @@ rum remove -y tuned-ppd || true
 ## ==========================================
 ## 2. STACK RAKUOS / NIRI / COMPONENTI DI SISTEMA
 ## ==========================================
+# Stack DMS/runtime Dux:
+# - dms arriva da duxlabs/dms-git e carica libdux-qt-base invece di /usr/bin/qs;
+#   e' la build che supporta il pragma DiskCache (nessun rebuild QML a ogni login).
+# - dux-qt-base-git e' il runtime condiviso richiesto da dms e dux-calendar-git;
+#   il pacchetto stabile dux-qt-base e' in conflitto, quindi non va installato.
+# - dux-greeter/dux-calendar-git/dux-search sostituiscono i vecchi
+#   dms-greeter/dankcalendar-git/danksearch (forniscono/obsoletano gli stessi
+#   capability, ma sono allineati al runtime Dux).
+# - quickshell resta per dux-greeter, che non usa ancora libdux-qt-base.
 rum install -y \
     niri \
     xwayland-satellite \
     dms \
-    dms-greeter \
-    dankcalendar-git \
-    danksearch \
+    dux-greeter \
+    dux-calendar-git \
+    dux-search \
     quickshell \
-    dux-qt-base \
+    dux-qt-base-git \
     greetd \
     cups-pk-helper \
     xdg-desktop-portal \
